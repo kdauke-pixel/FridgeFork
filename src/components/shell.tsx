@@ -248,7 +248,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="footer-brand">
             fridge & fork.
           </Link>
-          <p>Geri ingredientai. Naujos idėjos. Mažiau švaistymo.</p>
+          <p>Gaminame kartu — atrandame daugiau skonių!</p>
           <div>
             <a href="https://www.themealdb.com/" target="_blank" rel="noreferrer">
               TheMealDB ↗
