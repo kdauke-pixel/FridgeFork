@@ -11,9 +11,11 @@ import { api } from "@/lib/telemetry";
 import { ingredientLabel } from "@/lib/ingredients";
 import type { Meal } from "@/lib/types";
 import { recipeActionPath } from "@/lib/routing";
+import { RecipeNotes } from "./recipe-notes";
 
 export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
-  const { data, session, requireAuth, patchData, notice, ready } = useApp();
+  const { data, session, requireAuth, patchData, saveFavorite, removeFavorite, notice, ready } =
+    useApp();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
@@ -25,7 +27,6 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resultSaved, setResultSaved] = useState(false);
-  const [note, setNote] = useState("");
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -52,9 +53,6 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     return () => controller.abort();
   }, [id, retry]);
   const favorite = data.favorites[id];
-  useEffect(() => {
-    setNote(favorite?.note ?? "");
-  }, [favorite?.note, id]);
 
   useEffect(() => {
     accountVersion.current++;
@@ -77,15 +75,12 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     if (action === "adapt") setAdapt(true);
     else {
       setSaving(true);
-      void patchData("favorites", (current) => ({
-        ...current,
-        [id]: current[id] ?? { meal, note: "" },
-      })).then((ok) => {
+      void saveFavorite(meal).then((ok) => {
         if (ok) notice("Receptas išsaugotas.");
         setSaving(false);
       });
     }
-  }, [ready, session, meal, action, id, params, pathname, router, patchData, notice]);
+  }, [ready, session, meal, action, id, params, pathname, router, saveFavorite, notice]);
 
   async function toggleFavorite() {
     if (
@@ -94,14 +89,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     )
       return;
     setSaving(true);
-    if (
-      await patchData("favorites", (current) => {
-        const next = { ...current };
-        if (favorite) delete next[id];
-        else next[id] = { meal, note: "" };
-        return next;
-      })
-    )
+    if (await (favorite ? removeFavorite(id) : saveFavorite(meal)))
       notice(favorite ? "Receptas pašalintas." : "Receptas išsaugotas.");
     setSaving(false);
   }
@@ -270,38 +258,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                 ))}
             </div>
             {favorite && (
-              <section className="notes-section">
-                <h3>Mano pastabos</h3>
-                <label htmlFor="recipe-note">Asmeninė pastaba</label>
-                <textarea
-                  id="recipe-note"
-                  maxLength={3000}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="Ką kitą kartą darytum kitaip?"
-                />
-                <button
-                  className="button button-outline"
-                  disabled={saving || note === favorite.note}
-                  onClick={async () => {
-                    setSaving(true);
-                    if (
-                      await patchData("favorites", (current) =>
-                        current[id]
-                          ? {
-                              ...current,
-                              [id]: { ...current[id], note },
-                            }
-                          : current,
-                      )
-                    )
-                      notice("Pastaba išsaugota.");
-                    setSaving(false);
-                  }}
-                >
-                  Išsaugoti pastabą
-                </button>
-              </section>
+              <RecipeNotes key={`${session?.user.id}:${id}`} id={id} favorite={favorite} />
             )}
           </div>
         </>

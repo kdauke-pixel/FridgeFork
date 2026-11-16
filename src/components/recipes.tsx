@@ -20,7 +20,7 @@ export function useOpenRecipe() {
 }
 
 export function RecipeCard({ meal }: { meal: Meal }) {
-  const { data, patchData, requireAuth, notice, ready } = useApp();
+  const { data, saveFavorite, removeFavorite, requireAuth, notice, ready } = useApp();
   const [busy, setBusy] = useState(false);
   const open = useOpenRecipe();
   const saved = !!data.favorites[meal.id];
@@ -39,14 +39,7 @@ export function RecipeCard({ meal }: { meal: Meal }) {
           ? (await api<{ meals: Meal[] }>(`/api/meals?id=${meal.id}`)).meals[0]
           : meal;
       if (!complete) throw new Error("Recepto išsaugoti nepavyko.");
-      if (
-        await patchData("favorites", (current) => {
-          const next = { ...current };
-          if (saved) delete next[meal.id];
-          else next[meal.id] = { meal: complete, note: "" };
-          return next;
-        })
-      )
+      if (await (saved ? removeFavorite(meal.id) : saveFavorite(complete)))
         notice(
           saved ? "Receptas pašalintas iš mėgstamų." : "Receptas išsaugotas tavo kolekcijoje.",
         );

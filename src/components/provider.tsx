@@ -4,8 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { AccountData, Operation } from "@/lib/types";
+import type { AccountData, Favorite, Meal, Operation } from "@/lib/types";
 import { safeReturnPath } from "@/lib/routing";
+import { deleteFavorite, insertFavorite, loadFavorites, updateFavoriteNote } from "@/lib/favorites";
+
+type AccountField = Exclude<keyof AccountData, "favorites">;
 
 const emptyData = (): AccountData => ({
   pantry: [],
@@ -33,10 +36,13 @@ type AppContext = {
   developer: boolean;
   setDeveloper: (value: boolean) => void;
   notice: (message: string) => void;
-  patchData: <K extends keyof AccountData>(
+  patchData: <K extends AccountField>(
     key: K,
     value: AccountData[K] | ((current: AccountData[K]) => AccountData[K]),
   ) => Promise<boolean>;
+  saveFavorite: (meal: Meal) => Promise<boolean>;
+  removeFavorite: (recipeId: string) => Promise<boolean>;
+  saveNote: (recipeId: string, note: string) => Promise<boolean>;
   toggleIngredient: (id: string) => Promise<void>;
   requireAuth: (returnPath?: string) => boolean;
   signOut: () => Promise<void>;
@@ -59,6 +65,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const currentUser = useRef<string | null | undefined>(undefined);
   const dataRef = useRef(data);
   const saveQueues = useRef<Partial<Record<keyof AccountData, Promise<boolean>>>>({});
+  const favoriteQueues = useRef<Record<string, Promise<boolean>>>({});
   const router = useRouter();
   const pathname = usePathname();
   const notice = useCallback((message: string) => setToast(message), []);
@@ -91,17 +98,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
         return;
       }
-      const { data: row, error } = await supabase
-        .from("account_data")
-        .select("pantry,favorites,adaptations,conversations")
-        .eq("user_id", id)
-        .maybeSingle();
+      const [accountResult, favoritesResult] = await Promise.allSettled([
+        supabase
+          .from("account_data")
+          .select("pantry,adaptations,conversations")
+          .eq("user_id", id)
+          .maybeSingle(),
+        loadFavorites(supabase, id),
+      ]);
       if (disposed || version !== generation.current) return;
-      if (error) {
+      if (
+        accountResult.status === "rejected" ||
+        (accountResult.status === "fulfilled" && accountResult.value.error)
+      ) {
         notice("Nepavyko įkelti paskyros duomenų. Perkraukite puslapį ir bandykite dar kartą.");
         return;
       }
-      const loaded: AccountData = row ? { ...emptyData(), ...row } : emptyData();
+      if (favoritesResult.status === "rejected") {
+        notice(
+          "Nepavyko įkelti mėgstamų receptų. Patikrinkite, ar Supabase paleistas favorites lentelės SQL perkėlimas, ir perkraukite puslapį.",
+        );
+        return;
+      }
+      const row = accountResult.value.data;
+      const loaded: AccountData = { ...emptyData(), ...row, favorites: favoritesResult.value };
       const guest = readGuest();
       loaded.pantry = [...new Set([...loaded.pantry, ...guest])].slice(0, 12);
       if (guest.length || !row) {
@@ -144,7 +164,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [notice, router]);
 
-  async function patchData<K extends keyof AccountData>(
+  async function patchData<K extends AccountField>(
     key: K,
     update: AccountData[K] | ((current: AccountData[K]) => AccountData[K]),
   ): Promise<boolean> {
@@ -184,6 +204,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveQueues.current[key] = task;
     return task;
   }
+
+  async function mutateFavorite(
+    recipeId: string,
+    change: () => Promise<Favorite | null>,
+  ): Promise<boolean> {
+    if (!ready || !session || !supabase) return false;
+    const version = generation.current;
+    const task = (favoriteQueues.current[recipeId] ?? Promise.resolve(true))
+      .then(async () => {
+        if (version !== generation.current) return false;
+        const favorite = await change();
+        if (version !== generation.current) return false;
+        const favorites = { ...dataRef.current.favorites };
+        if (favorite) favorites[recipeId] = favorite;
+        else delete favorites[recipeId];
+        dataRef.current = { ...dataRef.current, favorites };
+        setData(dataRef.current);
+        return true;
+      })
+      .catch(() => {
+        if (version === generation.current)
+          notice("Recepto pakeitimų išsaugoti nepavyko. Bandykite dar kartą.");
+        return false;
+      });
+    favoriteQueues.current[recipeId] = task;
+    return task;
+  }
+  async function saveFavorite(meal: Meal) {
+    if (!session || !supabase) return false;
+    return mutateFavorite(meal.id, () => insertFavorite(supabase!, session.user.id, meal));
+  }
+  async function removeFavorite(recipeId: string) {
+    if (!session || !supabase) return false;
+    return mutateFavorite(recipeId, async () => {
+      await deleteFavorite(supabase!, session.user.id, recipeId);
+      return null;
+    });
+  }
+  async function saveNote(recipeId: string, note: string) {
+    if (!session || !supabase || note.length > 3000) return false;
+    return mutateFavorite(recipeId, () =>
+      updateFavoriteNote(supabase!, session.user.id, recipeId, note),
+    );
+  }
   async function toggleIngredient(id: string) {
     await patchData("pantry", (pantry) => {
       if (!pantry.includes(id) && pantry.length >= 12) {
@@ -215,6 +279,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDeveloper,
         notice,
         patchData,
+        saveFavorite,
+        removeFavorite,
+        saveNote,
         toggleIngredient,
         requireAuth,
         signOut,

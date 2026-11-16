@@ -1745,6 +1745,15 @@ footer > span {
 .notes-section textarea {
   margin-bottom: 15px;
 }
+.note-status {
+  min-height: 24px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--green);
+}
+.note-status-error {
+  color: #a23d24;
+}
 .original-recipe {
   border-top: 1px solid var(--line);
   padding-top: 20px;

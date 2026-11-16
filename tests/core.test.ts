@@ -72,6 +72,12 @@ test("Developer diagnostics strip query secrets and unrecognized Supabase paths"
     safeSupabaseEndpoint("https://example.supabase.co/auth/v1/private-token-value"),
     "/auth/v1/session",
   );
+  assert.equal(
+    safeSupabaseEndpoint(
+      "https://example.supabase.co/rest/v1/favorites?user_id=eq.private-id&recipe_id=eq.52772",
+    ),
+    "/rest/v1/favorites",
+  );
 });
 
 test("Recipe actions preserve the current search and resume the intended recipe after login", () => {

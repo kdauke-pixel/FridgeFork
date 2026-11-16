@@ -16,7 +16,7 @@ Atidarykite http://localhost:3000. Receptų paieška ir svečio virtuvė veikia 
 ## Supabase ir Gemini paruošimas
 
 1. Nukopijuokite `.env.example` į `.env.local` ir užpildykite Supabase projekto URL bei viešą anon raktą. Nenaudokite `service_role` rakto.
-2. Supabase SQL Editor paleiskite `supabase/schema.sql`. Lentelės RLS taisyklės leidžia vartotojui skaityti ir keisti tik savo duomenis. Schema skirta vienkartiniam paleidimui naujame projekte.
+2. Naujame Supabase projekte SQL Editor paleiskite `supabase/schema.sql`, tada `supabase/migrations/20261116_favorites.sql`. Jau veikiančiame projekte paleiskite tik migracijos failą. RLS leidžia vartotojui skaityti ir keisti tik savo duomenis. Žr. [perkėlimo instrukciją](docs/favorites-perkelimas.md).
 3. Supabase Authentication įjunkite Email / Password ir el. pašto patvirtinimą. Nustatykite Site URL `http://localhost:3000`, o Redirect URLs pridėkite `http://localhost:3000/**`. Publikuojant pridėkite savo domeną ir jo grįžimo URL.
 4. Pridėkite Gemini raktą į `GEMINI_API_KEY`. `GEMINI_MODEL` galima pakeisti į jūsų projektui prieinamą modelį.
 5. Po aplinkos kintamųjų keitimo iš naujo paleiskite Next.js.
@@ -45,7 +45,8 @@ Kategorijų juosta remiasi tikromis TheMealDB kategorijomis; „pietūs“ ir �
 - **Naršyklė:** komponentai, paieškos URL, svečio produktai, Supabase Auth ir asmeniniai duomenys su RLS.
 - **Next.js `/api/meals`:** ribotos, patikrintos TheMealDB užklausos; atsakymai normalizuojami ir rūšiuojami, išorinėms užklausoms taikomas laiko limitas.
 - **Next.js `/api/ai`:** tikrina Supabase vartotojo access token ir perduoda ribotą pokalbį bei kontekstą Gemini. Raktas niekada negrąžinamas į naršyklę.
-- **Supabase `account_data`:** atskiri `pantry`, `favorites`, `adaptations`, `conversations` JSONB laukai vienam vartotojui. Keičiama atitinkama duomenų dalis. Ši pirmos versijos schema paprasta; vienalaikiai tos pačios kolekcijos pakeitimai keliuose įrenginiuose naudoja paskutinio įrašymo principą.
+- **Supabase `account_data`:** `pantry`, `adaptations`, `conversations` JSONB laukai vienam vartotojui. Sena `favorites` JSON reikšmė lieka tik kaip istorinis perkėlimo šaltinis.
+- **Supabase `favorites`:** po vieną vartotojo receptą eilutėje; atskiri `user_id`, `recipe_id`, `recipe_name`, `image_url`, `recipe_data`, `note`, `created_at` stulpeliai. Pastabos keitimas atnaujina tik konkrečios eilutės `note`. RLS ir unikali vartotojo / recepto pora užtikrina atskiras kolekcijas be dublikatų.
 - **Developer Mode:** jungiklis rodo paskutinės operacijos sistemą, saugų kelią, metodą, HTTP kodą, sėkmę ir apytikslę trukmę. Query parametrai, užklausų turinys, vartotojų ID, slaptažodžiai ir raktai į skydelį nepatenka. Tinklo klaidos be HTTP atsakymo žymimos „Nėra atsakymo“.
 
 ## Patikrinimas

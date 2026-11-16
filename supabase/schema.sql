@@ -1,4 +1,5 @@
 -- Run once in your Supabase project's SQL Editor. Never use a service-role key in the browser.
+-- Afterwards run migrations/20261116_favorites.sql to create the current favorites table.
 create table if not exists public.account_data (
   user_id uuid primary key references auth.users(id) on delete cascade,
   pantry jsonb not null default '[]'::jsonb check (jsonb_typeof(pantry) = 'array'),
