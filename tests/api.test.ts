@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { GET } from "../src/app/api/meals/route";
 
-const previousKey = process.env.MEALDB_API_KEY;
+let originalApiKey: string | undefined;
 beforeEach(() => {
+  originalApiKey = process.env.MEALDB_API_KEY;
   process.env.MEALDB_API_KEY = "test-server-key";
 });
 afterEach(() => {
-  if (previousKey === undefined) delete process.env.MEALDB_API_KEY;
-  else process.env.MEALDB_API_KEY = previousKey;
+  if (originalApiKey === undefined) delete process.env.MEALDB_API_KEY;
+  else process.env.MEALDB_API_KEY = originalApiKey;
 });
 
 test("Recipe API reports a missing server key without fetching", async () => {
