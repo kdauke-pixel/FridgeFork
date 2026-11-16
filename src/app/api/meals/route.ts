@@ -5,12 +5,20 @@ import type { Meal, Operation } from "@/lib/types";
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const operations: Operation[] = [];
+  const apiKey = process.env.MEALDB_API_KEY?.trim();
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Nenustatytas MEALDB_API_KEY aplinkos kintamasis.", operations },
+      { status: 500 },
+    );
+  }
+  const apiBaseUrl = `https://www.themealdb.com/api/json/v1/${encodeURIComponent(apiKey)}`;
   async function load(endpoint: string): Promise<Meal[]> {
     const started = performance.now();
     let status = 0;
     let ok = false;
     try {
-      const response = await fetch(`https://www.themealdb.com/api/json/v1/1/${endpoint}`, {
+      const response = await fetch(`${apiBaseUrl}/${endpoint}`, {
         signal: AbortSignal.timeout(12000),
         next: { revalidate: 3600 },
       });
@@ -23,7 +31,7 @@ export async function GET(request: NextRequest) {
     } finally {
       operations.push({
         system: "TheMealDB",
-        endpoint: `/api/json/v1/1/${endpoint.split("?")[0]}`,
+        endpoint: `/api/json/v1/[redacted]/${endpoint.split("?")[0]}`,
         method: "GET",
         status,
         ok,
