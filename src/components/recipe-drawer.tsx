@@ -1,5 +1,7 @@
 "use client";
 
+import { lithuanianValidation } from "@/lib/form-validation";
+
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Sparkles, ArrowUpRight, Check } from "lucide-react";
@@ -212,6 +214,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                   <textarea
                     id="adapt-request"
                     required
+                    {...lithuanianValidation}
                     maxLength={4000}
                     value={request}
                     onChange={(event) => setRequest(event.target.value)}

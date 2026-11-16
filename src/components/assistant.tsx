@@ -1,5 +1,7 @@
 "use client";
 
+import { lithuanianValidation } from "@/lib/form-validation";
+
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -258,6 +260,7 @@ export function AssistantPage() {
                 <textarea
                   id="chat-input"
                   required
+                  {...lithuanianValidation}
                   maxLength={4000}
                   placeholder="Kuo šiandien galiu padėti?"
                   value={input}

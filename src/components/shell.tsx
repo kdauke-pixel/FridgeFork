@@ -1,5 +1,7 @@
 "use client";
 
+import { lithuanianValidation } from "@/lib/form-validation";
+
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -159,6 +161,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             onChange={(event) => setQuery(event.target.value)}
             maxLength={100}
             required
+            {...lithuanianValidation}
           />
           <label className="sr-only" htmlFor="search-mode">
             Paieškos tipas

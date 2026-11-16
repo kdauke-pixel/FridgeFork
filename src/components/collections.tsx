@@ -1,5 +1,7 @@
 "use client";
 
+import { lithuanianValidation } from "@/lib/form-validation";
+
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight, Heart, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -83,6 +85,7 @@ export function KitchenPage() {
               id="add-product"
               value={ingredient}
               required
+              {...lithuanianValidation}
               onChange={(event) => setIngredient(event.target.value)}
             >
               <option value="">Pasirink produktą…</option>

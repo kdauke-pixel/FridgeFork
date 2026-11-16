@@ -1,5 +1,7 @@
 "use client";
 
+import { lithuanianValidation } from "@/lib/form-validation";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -189,6 +191,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   autoComplete="email"
                   placeholder="tavo@pastas.lt"
                   required
+                  {...lithuanianValidation}
                   maxLength={254}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -210,6 +213,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                     maxLength={128}
                     placeholder="Bent 8 simboliai"
                     required
+                    {...lithuanianValidation}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     disabled={busy || !supabase}
@@ -231,6 +235,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                       type={show ? "text" : "password"}
                       autoComplete="new-password"
                       required
+                      {...lithuanianValidation}
                       minLength={8}
                       maxLength={128}
                       value={confirmation}
