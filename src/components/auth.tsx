@@ -110,13 +110,18 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         router.replace("/");
       } else if (registration) {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/prisijungti?next=${encodeURIComponent(next)}`,
           },
         });
         if (error) throw error;
+        // Supabase can mask a duplicate confirmed account as a successful signup.
+        if (!data.session && data.user?.identities?.length === 0) {
+          setError("Šis el. paštas jau užregistruotas. Prisijunk arba atkurk slaptažodį.");
+          return;
+        }
         if (data.session) router.replace(next);
         else
           setSuccess(
