@@ -1,7 +1,17 @@
-import test from "node:test";
+import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { GET } from "../src/app/api/meals/route";
+
+let originalApiKey: string | undefined;
+beforeEach(() => {
+  originalApiKey = process.env.MEALDB_API_KEY;
+  process.env.MEALDB_API_KEY = "test-key";
+});
+afterEach(() => {
+  if (originalApiKey === undefined) delete process.env.MEALDB_API_KEY;
+  else process.env.MEALDB_API_KEY = originalApiKey;
+});
 
 test("Recipe API rejects invalid IDs and overlarge ingredient lists before fetching", async () => {
   for (const query of [
@@ -41,7 +51,7 @@ test("Recipe API merges ingredient matches and exposes only sanitized telemetry"
       ],
     );
     assert.equal(body.operations.length, 2);
-    assert.equal(body.operations[0].endpoint, "/api/json/v1/1/filter.php");
+    assert.equal(body.operations[0].endpoint, "/api/json/v1/[redacted]/filter.php");
     assert.equal(body.operations[0].method, "GET");
     assert.equal(body.operations[0].ok, true);
   } finally {
