@@ -18,6 +18,8 @@ test("AI authenticates requests, validates input and keeps credentials out of re
   delete process.env.GEMINI_MODEL;
   let geminiCalls = 0;
   let geminiStatus = 200;
+  let statuses: number[] = [];
+  let sentBody = "";
   globalThis.fetch = async (input, init) => {
     if (String(input).includes("/auth/v1/user"))
       return Response.json({
@@ -27,6 +29,7 @@ test("AI authenticates requests, validates input and keeps credentials out of re
         created_at: "2026-01-01T00:00:00Z",
       });
     geminiCalls++;
+    sentBody = String(init?.body ?? "");
     assert.equal(
       String(input),
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
@@ -35,8 +38,8 @@ test("AI authenticates requests, validates input and keeps credentials out of re
       new Headers(init?.headers).get("x-goog-api-key"),
       "test-secret-gemini-never-return",
     );
-    if (geminiStatus !== 200)
-      return Response.json({ error: "private upstream diagnostic" }, { status: geminiStatus });
+    const status = statuses.shift() ?? geminiStatus;
+    if (status !== 200) return Response.json({ error: "private upstream diagnostic" }, { status });
     return Response.json({
       candidates: [{ content: { parts: [{ text: "Pakepink daržoves ir patiek su ryžiais." }] } }],
     });
@@ -88,6 +91,63 @@ test("AI authenticates requests, validates input and keeps credentials out of re
     assert.equal(body.operations.at(-1).status, 429);
     assert.equal(body.operations.at(-1).ok, false);
     assert.ok(!JSON.stringify(body).includes("private upstream diagnostic"));
+    geminiStatus = 200;
+    const adaptation = {
+      mode: "adapt",
+      recipe: {
+        name: "Blynai",
+        ingredients: [{ name: "Pienas", measure: "200 ml" }],
+        instructions: "Sumaišykite ir kepkite.",
+      },
+      request: "Neturiu pieno ir sviesto, turiu tik 30 minučių.",
+      pantry: ["Avižų gėrimas"],
+    };
+    for (const invalid of [
+      { ...adaptation, recipe: null },
+      { ...adaptation, request: " " },
+      { ...adaptation, recipe: { ...adaptation.recipe, instructions: "" } },
+      { ...adaptation, recipe: { ...adaptation.recipe, ingredients: [] } },
+      { ...adaptation, pantry: [null] },
+    ])
+      assert.equal((await POST(request(invalid))).status, 400);
+    response = await POST(request(adaptation));
+    assert.equal(response.status, 200);
+    const sent = JSON.parse(sentBody);
+    assert.ok(sent.systemInstruction.parts[0].text.includes(JSON.stringify(adaptation.recipe)));
+    assert.ok(sent.systemInstruction.parts[0].text.includes("Avižų gėrimas"));
+    assert.equal(sent.contents[0].parts[0].text, adaptation.request);
+    assert.ok(sent.systemInstruction.parts[0].text.includes("Ingredientai su kiekiais"));
+    statuses = [503, 200];
+    response = await POST(
+      request({
+        ...adaptation,
+        request: "Gaminsiu keturiems žmonėms ir nenoriu labai aštraus maisto.",
+      }),
+    );
+    body = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      body.operations
+        .filter((op: { system: string }) => op.system === "Gemini")
+        .map((op: { status: number }) => op.status),
+      [503, 200],
+    );
+    statuses = [503, 503];
+    const beforeRetry = geminiCalls;
+    response = await POST(request(adaptation));
+    body = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(geminiCalls - beforeRetry, 2);
+    assert.match(body.error, /po minutės/);
+    assert.ok(!JSON.stringify(body).includes("private upstream"));
+    const originalTimeout = AbortSignal.timeout;
+    try {
+      AbortSignal.timeout = () => AbortSignal.abort();
+      response = await POST(request(adaptation));
+      assert.equal(response.status, 504);
+    } finally {
+      AbortSignal.timeout = originalTimeout;
+    }
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of keys) {

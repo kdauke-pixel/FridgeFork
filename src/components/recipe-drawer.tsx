@@ -4,7 +4,7 @@ import { lithuanianValidation } from "@/lib/form-validation";
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Heart, Sparkles, ArrowUpRight, Check } from "lucide-react";
+import { Heart, Sparkles, Check } from "lucide-react";
 import { Dialog } from "./dialog";
 import { useApp } from "./provider";
 import { api } from "@/lib/telemetry";
@@ -25,6 +25,8 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   const [result, setResult] = useState("");
   const [resultRequest, setResultRequest] = useState("");
   const [busy, setBusy] = useState(false);
+  const [adaptError, setAdaptError] = useState("");
+  const generation = useRef(0);
   const [saving, setSaving] = useState(false);
   const [resultSaved, setResultSaved] = useState(false);
   const params = useSearchParams();
@@ -35,6 +37,10 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   const action = params.get("veiksmas");
   useEffect(() => {
     const controller = new AbortController();
+    generation.current++;
+    setBusy(false);
+    setRequest("");
+    setAdaptError("");
     setMeal(null);
     setError("");
     setAdapt(false);
@@ -50,12 +56,17 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
       .catch((error: Error) => {
         if (!controller.signal.aborted) setError(error.message);
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      generation.current++;
+    };
   }, [id, retry]);
   const favorite = data.favorites[id];
 
   useEffect(() => {
     accountVersion.current++;
+    generation.current++;
+    setAdaptError("");
     setRequest("");
     setResult("");
     setResultSaved(false);
@@ -95,9 +106,12 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   }
   async function generate(event: React.FormEvent) {
     event.preventDefault();
-    if (!meal || !requireAuth() || !session) return;
+    if (!meal || busy || !request.trim() || !requireAuth() || !session) return;
     const version = accountVersion.current;
+    const run = ++generation.current;
+    const submittedRequest = request.trim();
     setBusy(true);
+    setAdaptError("");
     setResult("");
     setResultSaved(false);
     try {
@@ -108,20 +122,20 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          messages: [{ role: "user", text: request }],
-          context: JSON.stringify({
-            recipe: meal,
-            pantry: includePantry ? data.pantry.map(ingredientLabel) : [],
-          }),
+          mode: "adapt",
+          recipe: meal,
+          request: submittedRequest,
+          pantry: includePantry ? data.pantry.map(ingredientLabel) : [],
         }),
       });
-      if (version !== accountVersion.current) return;
+      if (version !== accountVersion.current || run !== generation.current) return;
       setResult(response.text);
-      setResultRequest(request);
+      setResultRequest(submittedRequest);
     } catch (error) {
-      if (version === accountVersion.current) notice((error as Error).message);
+      if (version === accountVersion.current && run === generation.current)
+        setAdaptError((error as Error).message);
     } finally {
-      if (version === accountVersion.current) setBusy(false);
+      if (version === accountVersion.current && run === generation.current) setBusy(false);
     }
   }
   async function saveAdaptation() {
@@ -190,18 +204,19 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                 }}
                 aria-expanded={adapt}
               >
-                <Sparkles size={17} /> Pritaikyti su AI
+                <Sparkles size={17} /> Pritaikyti receptą
               </button>
             </div>
             {adapt && (
               <section className="adapt-section">
-                <h3>Pagamink savaip</h3>
+                <h3>AI recepto gelbėtojas</h3>
                 <p>Ko trūksta arba ką norėtum pakeisti?</p>
                 <form onSubmit={generate}>
                   <label htmlFor="adapt-request">Tavo prašymas</label>
                   <textarea
                     id="adapt-request"
                     required
+                    disabled={busy}
                     {...lithuanianValidation}
                     maxLength={4000}
                     value={request}
@@ -218,9 +233,15 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                   </label>
                   <button className="button button-dark" disabled={busy || !request.trim()}>
                     {busy ? "AI kuria receptą…" : "Pritaikyti receptą"}
-                    <ArrowUpRight size={16} />
+                    <Sparkles size={16} />
                   </button>
                 </form>
+                {busy && <p role="status">Pritaikome receptą pagal tavo situaciją…</p>}
+                {adaptError && (
+                  <p className="inline-error" role="alert">
+                    {adaptError}
+                  </p>
+                )}
                 {result && (
                   <div className="ai-result">
                     <div className="eyebrow">
