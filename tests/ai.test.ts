@@ -15,7 +15,7 @@ test("AI authenticates requests, validates input and keeps credentials out of re
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-public-anon";
   process.env.GEMINI_API_KEY = "test-secret-gemini-never-return";
-  process.env.GEMINI_MODEL = "gemini-3.5-flash";
+  delete process.env.GEMINI_MODEL;
   let geminiCalls = 0;
   let geminiStatus = 200;
   globalThis.fetch = async (input, init) => {
@@ -27,6 +27,10 @@ test("AI authenticates requests, validates input and keeps credentials out of re
         created_at: "2026-01-01T00:00:00Z",
       });
     geminiCalls++;
+    assert.equal(
+      String(input),
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+    );
     assert.equal(
       new Headers(init?.headers).get("x-goog-api-key"),
       "test-secret-gemini-never-return",

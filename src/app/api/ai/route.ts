@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     return fail("Užklausa per ilga arba netinkama. Pradėkite naują pokalbį.", 400);
   if (messages[0].role !== "user" || messages.at(-1).role !== "user")
     return fail("Pokalbį turi pradėti vartotojas.", 400);
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   if (!/^[a-zA-Z0-9.-]+$/.test(model)) return fail("AI asistentas dar neparuoštas.", 503);
   const endpoint = `/v1beta/models/${model}:generateContent`;
   const started = performance.now();
