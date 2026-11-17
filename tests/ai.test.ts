@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { POST } from "../src/app/api/ai/route";
+import { buildAdaptationPrompt, adaptationGoals } from "../src/lib/adaptation-prompt";
 
 test("AI authenticates requests, validates input and keeps credentials out of responses", async () => {
   const originalFetch = globalThis.fetch;
@@ -101,6 +102,7 @@ test("AI authenticates requests, validates input and keeps credentials out of re
       },
       request: "Neturiu pieno ir sviesto, turiu tik 30 minučių.",
       pantry: ["Avižų gėrimas"],
+      options: { minutes: 30 as const, servings: 4 as const, goal: "pigiau" as const },
     };
     for (const invalid of [
       { ...adaptation, recipe: null },
@@ -108,14 +110,56 @@ test("AI authenticates requests, validates input and keeps credentials out of re
       { ...adaptation, recipe: { ...adaptation.recipe, instructions: "" } },
       { ...adaptation, recipe: { ...adaptation.recipe, ingredients: [] } },
       { ...adaptation, pantry: [null] },
+      ...[
+        null,
+        [],
+        { minutes: 20 },
+        { minutes: "30" },
+        { servings: 3 },
+        { goal: "bet kas" },
+        { unexpected: true },
+      ].map((options) => ({ ...adaptation, options })),
     ])
       assert.equal((await POST(request(invalid))).status, 400);
     response = await POST(request(adaptation));
     assert.equal(response.status, 200);
     const sent = JSON.parse(sentBody);
-    assert.ok(sent.systemInstruction.parts[0].text.includes(JSON.stringify(adaptation.recipe)));
-    assert.ok(sent.systemInstruction.parts[0].text.includes("Avižų gėrimas"));
-    assert.equal(sent.contents[0].parts[0].text, adaptation.request);
+    const expected = buildAdaptationPrompt(
+      adaptation.recipe,
+      adaptation.request,
+      adaptation.pantry,
+      adaptation.options,
+    );
+    assert.equal(sent.systemInstruction.parts[0].text, expected.systemInstruction);
+    assert.equal(sent.contents[0].parts[0].text, expected.userText);
+    const promptData = JSON.parse(sent.contents[0].parts[0].text);
+    assert.deepEqual(promptData.pasirinkimai, {
+      laikasMinutemis: 30,
+      zmoniuSkaicius: 4,
+      tikslas: "pigiau",
+    });
+    assert.equal(promptData.originalusReceptas.gaminimoInstrukcija, adaptation.recipe.instructions);
+    assert.deepEqual(promptData.originalusReceptas.ingredientai, adaptation.recipe.ingredients);
+    for (const minutes of [15, 30, 60]) {
+      for (const servings of [1, 2, 4, 6]) {
+        for (const goal of adaptationGoals) {
+          assert.equal(
+            (await POST(request({ ...adaptation, options: { minutes, servings, goal } }))).status,
+            200,
+          );
+          assert.deepEqual(
+            JSON.parse(JSON.parse(sentBody).contents[0].parts[0].text).pasirinkimai,
+            { laikasMinutemis: minutes, zmoniuSkaicius: servings, tikslas: goal },
+          );
+        }
+      }
+    }
+    assert.equal((await POST(request({ ...adaptation, options: undefined }))).status, 200);
+    assert.deepEqual(JSON.parse(JSON.parse(sentBody).contents[0].parts[0].text).pasirinkimai, {
+      laikasMinutemis: null,
+      zmoniuSkaicius: null,
+      tikslas: null,
+    });
     assert.ok(sent.systemInstruction.parts[0].text.includes("Ingredientai su kiekiais"));
     statuses = [503, 200];
     response = await POST(

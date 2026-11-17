@@ -12,6 +12,12 @@ import { ingredientLabel } from "@/lib/ingredients";
 import type { Meal } from "@/lib/types";
 import { recipeActionPath } from "@/lib/routing";
 import { RecipeNotes } from "./recipe-notes";
+import {
+  adaptationGoals,
+  buildAdaptationPrompt,
+  describeAdaptationRequest,
+  type AdaptationOptions,
+} from "@/lib/adaptation-prompt";
 
 export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   const { data, session, requireAuth, patchData, saveFavorite, removeFavorite, notice, ready } =
@@ -21,6 +27,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   const [retry, setRetry] = useState(0);
   const [adapt, setAdapt] = useState(false);
   const [request, setRequest] = useState("");
+  const [options, setOptions] = useState<AdaptationOptions>({});
   const [includePantry, setIncludePantry] = useState(true);
   const [result, setResult] = useState("");
   const [resultRequest, setResultRequest] = useState("");
@@ -40,6 +47,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     generation.current++;
     setBusy(false);
     setRequest("");
+    setOptions({});
     setAdaptError("");
     setMeal(null);
     setError("");
@@ -68,6 +76,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     generation.current++;
     setAdaptError("");
     setRequest("");
+    setOptions({});
     setResult("");
     setResultSaved(false);
     setAdapt(false);
@@ -125,12 +134,13 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
           mode: "adapt",
           recipe: meal,
           request: submittedRequest,
+          options,
           pantry: includePantry ? data.pantry.map(ingredientLabel) : [],
         }),
       });
       if (version !== accountVersion.current || run !== generation.current) return;
       setResult(response.text);
-      setResultRequest(submittedRequest);
+      setResultRequest(describeAdaptationRequest(submittedRequest, options));
     } catch (error) {
       if (version === accountVersion.current && run === generation.current)
         setAdaptError((error as Error).message);
@@ -223,9 +233,76 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                     onChange={(event) => setRequest(event.target.value)}
                     placeholder="Pvz., pakeisk pieną augaliniu gėrimu ir pritaikyk 2 porcijoms."
                   />
+                  <fieldset className="adapt-quick-options" disabled={busy}>
+                    <legend>Greiti pasirinkimai (neprivalomi)</legend>
+                    <label>
+                      Kiek laiko turiu?
+                      <select
+                        value={options.minutes ?? ""}
+                        onChange={(event) =>
+                          setOptions({
+                            ...options,
+                            minutes: event.target.value
+                              ? (Number(event.target.value) as AdaptationOptions["minutes"])
+                              : undefined,
+                          })
+                        }
+                      >
+                        <option value="">Nepasirinkta</option>
+                        {[15, 30, 60].map((minutes) => (
+                          <option key={minutes} value={minutes}>
+                            {minutes} min.
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Kiek žmonių?
+                      <select
+                        value={options.servings ?? ""}
+                        onChange={(event) =>
+                          setOptions({
+                            ...options,
+                            servings: event.target.value
+                              ? (Number(event.target.value) as AdaptationOptions["servings"])
+                              : undefined,
+                          })
+                        }
+                      >
+                        <option value="">Nepasirinkta</option>
+                        {[1, 2, 4, 6].map((servings) => (
+                          <option key={servings} value={servings}>
+                            {servings}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Ko noriu?
+                      <select
+                        value={options.goal ?? ""}
+                        onChange={(event) =>
+                          setOptions({
+                            ...options,
+                            goal: event.target.value
+                              ? (event.target.value as AdaptationOptions["goal"])
+                              : undefined,
+                          })
+                        }
+                      >
+                        <option value="">Nepasirinkta</option>
+                        {adaptationGoals.map((goal) => (
+                          <option key={goal} value={goal}>
+                            {goal}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </fieldset>
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
+                      disabled={busy}
                       checked={includePantry}
                       onChange={(event) => setIncludePantry(event.target.checked)}
                     />{" "}
@@ -236,6 +313,32 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                     <Sparkles size={16} />
                   </button>
                 </form>
+                <details className="adapt-prompt-preview">
+                  <summary>Peržiūrėti Gemini siunčiamą promptą</summary>
+                  <p>Peržiūra pagal dabartinį receptą, tekstą ir pasirinkimus.</p>
+                  <h4>Sistemos instrukcija</h4>
+                  <pre>
+                    {
+                      buildAdaptationPrompt(
+                        meal,
+                        request,
+                        includePantry ? data.pantry.map(ingredientLabel) : [],
+                        options,
+                      ).systemInstruction
+                    }
+                  </pre>
+                  <h4>Vartotojo duomenys</h4>
+                  <pre>
+                    {
+                      buildAdaptationPrompt(
+                        meal,
+                        request,
+                        includePantry ? data.pantry.map(ingredientLabel) : [],
+                        options,
+                      ).userText
+                    }
+                  </pre>
+                </details>
                 {busy && <p role="status">Pritaikome receptą pagal tavo situaciją…</p>}
                 {adaptError && (
                   <p className="inline-error" role="alert">

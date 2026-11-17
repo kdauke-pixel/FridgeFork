@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { Operation } from "@/lib/types";
+import {
+  buildAdaptationPrompt,
+  validAdaptationOptions,
+  adaptationSystemInstruction,
+} from "@/lib/adaptation-prompt";
 
 export async function POST(request: NextRequest) {
   const operations: Operation[] = [];
@@ -53,21 +58,21 @@ export async function POST(request: NextRequest) {
           item.measure.length > 200,
       ) ||
       !validText(body.request, 4000) ||
+      (body.options !== undefined && !validAdaptationOptions(body.options)) ||
       (body.pantry !== undefined &&
         (!Array.isArray(body.pantry) ||
           body.pantry.length > 12 ||
           body.pantry.some((item: unknown) => !validText(item, 100))))
     )
       return fail("Pateikite pilną receptą ir prašymą iki 4000 simbolių.", 400);
-    body.messages = [{ role: "user", text: body.request.trim() }];
-    body.context = JSON.stringify({
-      recipe: {
-        name: recipe.name,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
-      },
-      pantry: body.pantry ?? [],
-    });
+    const prompt = buildAdaptationPrompt(
+      recipe,
+      body.request,
+      body.pantry ?? [],
+      body.options ?? {},
+    );
+    body.messages = [{ role: "user", text: prompt.userText }];
+    body.context = "";
   }
   const { messages, context } = body;
   if (
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
         !["user", "model"].includes(message?.role ?? "") ||
         typeof message.text !== "string" ||
         !message.text.trim() ||
-        message.text.length > 4000,
+        message.text.length > (adapting ? 65000 : 4000),
     ) ||
     (context !== undefined &&
       (typeof context !== "string" || context.length > (adapting ? 65000 : 14000)))
@@ -113,7 +118,9 @@ export async function POST(request: NextRequest) {
           parts: [{ text: message.text }],
         })),
         config: {
-          systemInstruction: systemInstruction + "\nKontekstas:\n" + (context ?? ""),
+          systemInstruction: adapting
+            ? adaptationSystemInstruction
+            : systemInstruction + "\nKontekstas:\n" + (context ?? ""),
           maxOutputTokens: 4096,
           abortSignal: signal,
         },

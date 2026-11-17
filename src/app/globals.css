@@ -1699,6 +1699,44 @@ footer > span {
 .adapt-section textarea {
   background: var(--paper);
 }
+.adapt-quick-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+}
+.adapt-quick-options legend {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 12px 0 0;
+}
+.adapt-quick-options label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.adapt-quick-options select {
+  width: 100%;
+  min-width: 0;
+  background: var(--paper);
+}
+.adapt-prompt-preview {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.adapt-prompt-preview summary {
+  cursor: pointer;
+}
+.adapt-prompt-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: var(--paper);
+  max-height: 360px;
+  overflow: auto;
+}
 .checkbox-label {
   display: flex !important;
   align-items: center;
