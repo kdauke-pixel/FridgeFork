@@ -10,7 +10,6 @@ import { Fridge, IngredientPicker } from "./fridge";
 import { ingredientLabel, ingredients } from "@/lib/ingredients";
 import { RecipeGrid } from "./recipes";
 import { Dialog } from "./dialog";
-import type { Adaptation } from "@/lib/types";
 
 export function AccountGate({ children }: { children: React.ReactNode }) {
   const { session, ready, requireAuth } = useApp();
@@ -202,8 +201,10 @@ export function SavedPage() {
 }
 
 export function AdaptationsPage() {
-  const { data, patchData, notice } = useApp();
-  const [selected, setSelected] = useState<Adaptation | null>(null);
+  const { data, session, ready, patchData, notice } = useApp();
+  const [selectedId, setSelected] = useState<string | null>(null);
+  const selected =
+    session && ready ? data.adaptations.find((item) => item.id === selectedId) : undefined;
   const [busy, setBusy] = useState(false);
   return (
     <div className="interior-page">
@@ -220,7 +221,7 @@ export function AdaptationsPage() {
           <div className="empty-state">
             <Sparkles size={38} />
             <h2>Čia prasidės tavo eksperimentai</h2>
-            <p>Atidaryk receptą, pasirink „Pritaikyti su AI“ ir išsaugok rezultatą.</p>
+            <p>Atidaryk receptą, pasirink „Pritaikyti receptą“ ir išsaugok rezultatą.</p>
             <Link href="/" className="button button-primary">
               Atrasti receptus <ArrowUpRight size={17} />
             </Link>
@@ -229,14 +230,14 @@ export function AdaptationsPage() {
           <div className="recipe-grid">
             {data.adaptations.map((item) => (
               <article className="recipe-card adaptation-card" key={item.id}>
-                <button className="recipe-image-button" onClick={() => setSelected(item)}>
+                <button className="recipe-image-button" onClick={() => setSelected(item.id)}>
                   <img src={item.meal.image} alt={item.meal.name} loading="lazy" />
                 </button>
                 <div className="recipe-info">
                   <div className="eyebrow">
                     <Sparkles size={13} /> PRITAIKYTA TAU
                   </div>
-                  <button className="recipe-title" onClick={() => setSelected(item)}>
+                  <button className="recipe-title" onClick={() => setSelected(item.id)}>
                     <h3>{item.meal.name}</h3>
                     <ArrowUpRight size={18} />
                   </button>

@@ -115,7 +115,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
   }
   async function generate(event: React.FormEvent) {
     event.preventDefault();
-    if (!meal || busy || !request.trim() || !requireAuth() || !session) return;
+    if (!meal || busy || saving || !request.trim() || !requireAuth() || !session) return;
     const version = accountVersion.current;
     const run = ++generation.current;
     const submittedRequest = request.trim();
@@ -149,7 +149,10 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
     }
   }
   async function saveAdaptation() {
-    if (!meal || !requireAuth()) return;
+    if (!meal || !result.trim() || saving || busy || resultSaved || !ready || !requireAuth())
+      return;
+    const version = accountVersion.current;
+    const run = generation.current;
     setSaving(true);
     const ok = await patchData("adaptations", (current) => [
       {
@@ -161,7 +164,7 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
       },
       ...current,
     ]);
-    if (ok) {
+    if (ok && version === accountVersion.current && run === generation.current) {
       setResultSaved(true);
       notice("AI receptas išsaugotas.");
     }
@@ -308,7 +311,10 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                     />{" "}
                     Pridėti „Mano virtuvės“ produktus
                   </label>
-                  <button className="button button-dark" disabled={busy || !request.trim()}>
+                  <button
+                    className="button button-dark"
+                    disabled={busy || saving || !request.trim()}
+                  >
                     {busy ? "AI kuria receptą…" : "Pritaikyti receptą"}
                     <Sparkles size={16} />
                   </button>
@@ -353,11 +359,11 @@ export function RecipeDrawer({ id, close }: { id: string; close: () => void }) {
                     <div className="preserve-lines">{result}</div>
                     <button
                       className="button button-outline"
-                      disabled={saving || resultSaved}
+                      disabled={saving || resultSaved || !ready}
                       onClick={() => void saveAdaptation()}
                     >
                       <Check size={16} />
-                      {resultSaved ? "Išsaugota" : "Išsaugoti AI receptą"}
+                      {resultSaved ? "Išsaugota" : "Išsaugoti pritaikytą receptą"}
                     </button>
                   </div>
                 )}
