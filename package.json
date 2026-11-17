@@ -8,7 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:gemini": "node scripts/test-gemini.mjs",
+    "test:gemini": "node --env-file=.env.local scripts/test-gemini.mjs",
     "format": "prettier --write src tests package.json tsconfig.json next.config.ts README.md",
     "format:check": "prettier --check src tests package.json tsconfig.json next.config.ts README.md"
   },
